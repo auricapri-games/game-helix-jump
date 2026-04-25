@@ -5,9 +5,10 @@
 
 ## Sprites required
 
-- ball.png 40x40 yellow
-- platform_safe.png 90x30 green
-- platform_dead.png 90x30 red
+- ball.png 36x36 yellow ball
+- disc_segment_safe.png 90x16 green/yellow segment with bevel
+- disc_segment_deadly.png 90x16 red segment with spikes hint
+- tower_pole.png 20x800 dark vertical pole
 
 ## How to generate
 
