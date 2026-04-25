@@ -5,146 +5,144 @@ import 'package:flutter/material.dart';
 import '../core/game_state.dart';
 import '../ds/app_theme.dart';
 
-/// Renders a top-down view of the active helix ring as colored arc slices,
-/// plus a needle showing where the ball will drop. Pure painting — no
-/// arithmetic ever leaves this file (that's why it's a CustomPainter, not
-/// a Widget build()).
-class HelixRingPainter extends CustomPainter {
-  HelixRingPainter({
-    required this.ring,
-    required this.ballAngle,
-    required this.rotationProgress,
+/// Renders the helix tower from a slightly tilted top-down perspective:
+/// a stack of flat discs (oval shapes, divided into pie segments) with a
+/// vertical pole behind. The ball sits at the centre at a fixed screen Y.
+///
+/// Pure painter — no widget state, no gameplay logic. Reads only [discs],
+/// [cameraY] and [towerRotation] from the immutable [HelixState].
+class HelixTowerPainter extends CustomPainter {
+  HelixTowerPainter({
+    required this.discs,
+    required this.cameraY,
+    required this.towerRotation,
+    required this.ballScreenFraction,
   });
 
-  final HelixRing ring;
-  final int ballAngle;
-  final double rotationProgress;
+  /// All currently active discs (world coordinates).
+  final List<HelixDisc> discs;
+
+  /// How far the ball has fallen — discs are drawn at
+  /// `screenY = ballY + (disc.y - cameraY)`.
+  final double cameraY;
+
+  /// Tower rotation in radians, applied to every disc.
+  final double towerRotation;
+
+  /// Where the ball is on screen, as fraction of canvas height.
+  /// 0.4 = roughly upper-third.
+  final double ballScreenFraction;
+
+  static const double _discWidth = 220;
+  static const double _discHeight = 44;
+  static const double _poleWidth = 24;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final outerR = math.min(size.width, size.height) / 2 - 6;
-    final innerR = outerR * 0.55;
+    final cx = size.width / 2;
+    final ballY = size.height * ballScreenFraction;
 
-    final n = ring.segments.length;
-    final sweep = (math.pi * 2) / n;
-    final ballSweepCenter = ballAngle * sweep + sweep / 2 + rotationProgress;
+    // Vertical pole — drawn first (background layer).
+    final poleRect = Rect.fromCenter(
+      center: Offset(cx, size.height / 2),
+      width: _poleWidth,
+      height: size.height,
+    );
+    final polePaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFF1C0E07),
+          AppTheme.colorScheme.surfaceContainerHigh.withOpacity(0.8),
+          const Color(0xFF1C0E07),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(poleRect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(poleRect, const Radius.circular(8)),
+      polePaint,
+    );
 
-    // background ring shadow
-    canvas.drawCircle(
-      center.translate(0, 6),
-      outerR,
+    final sorted = List<HelixDisc>.of(discs)
+      ..sort((a, b) => a.y.compareTo(b.y));
+    for (final disc in sorted) {
+      final discScreenY = ballY + (disc.y - cameraY);
+      if (discScreenY < -_discHeight) continue;
+      if (discScreenY > size.height + _discHeight) continue;
+      _paintDisc(canvas, cx, discScreenY, disc);
+    }
+  }
+
+  void _paintDisc(Canvas canvas, double cx, double cy, HelixDisc disc) {
+    final rect = Rect.fromCenter(
+      center: Offset(cx, cy),
+      width: _discWidth,
+      height: _discHeight,
+    );
+    final shadowRect = rect.shift(const Offset(0, 8));
+    canvas.drawOval(
+      shadowRect,
       Paint()
         ..color = const Color(0x66000000)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
 
+    final n = disc.segments.length;
+    final sweep = (math.pi * 2) / n;
     for (var i = 0; i < n; i++) {
-      final start = i * sweep + rotationProgress - math.pi / 2;
-      final color = _segmentColor(ring.segments[i]);
-      final edgeColor = _segmentEdge(ring.segments[i]);
-      final path = Path()
-        ..moveTo(
-          center.dx + innerR * math.cos(start),
-          center.dy + innerR * math.sin(start),
-        )
-        ..lineTo(
-          center.dx + outerR * math.cos(start),
-          center.dy + outerR * math.sin(start),
-        )
-        ..arcTo(
-          Rect.fromCircle(center: center, radius: outerR),
-          start,
-          sweep,
-          false,
-        )
-        ..lineTo(
-          center.dx + innerR * math.cos(start + sweep),
-          center.dy + innerR * math.sin(start + sweep),
-        )
-        ..arcTo(
-          Rect.fromCircle(center: center, radius: innerR),
-          start + sweep,
-          -sweep,
-          false,
-        )
-        ..close();
-      canvas.drawPath(path, Paint()..color = color);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = edgeColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0,
-      );
+      final start = i * sweep + towerRotation;
+      final paint = Paint()..color = _segmentColor(disc.segments[i]);
+      canvas.drawArc(rect, start, sweep, true, paint);
     }
 
-    // central well (where ball drops through)
-    canvas.drawCircle(
-      center,
-      innerR - 4,
-      Paint()..color = const Color(0xFF1F0E07),
-    );
-    canvas.drawCircle(
-      center,
-      innerR - 4,
+    final bevelRect = rect.deflate(2);
+    canvas.drawOval(
+      bevelRect,
       Paint()
-        ..color = AppTheme.colorScheme.secondary
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = 1.6
+        ..color = AppTheme.colorScheme.tertiary.withOpacity(0.55),
+    );
+    canvas.drawOval(
+      rect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..color = AppTheme.colorScheme.surface,
     );
 
-    // pointer arrow showing the ball's drop slot
-    final arrowR = innerR - 8;
-    final arrowAngle = ballSweepCenter - math.pi / 2;
-    final tip = Offset(
-      center.dx + arrowR * math.cos(arrowAngle),
-      center.dy + arrowR * math.sin(arrowAngle),
-    );
-    final left = Offset(
-      center.dx + (arrowR - 12) * math.cos(arrowAngle - 0.3),
-      center.dy + (arrowR - 12) * math.sin(arrowAngle - 0.3),
-    );
-    final right = Offset(
-      center.dx + (arrowR - 12) * math.cos(arrowAngle + 0.3),
-      center.dy + (arrowR - 12) * math.sin(arrowAngle + 0.3),
-    );
-    final arrowPath = Path()
-      ..moveTo(tip.dx, tip.dy)
-      ..lineTo(left.dx, left.dy)
-      ..lineTo(right.dx, right.dy)
-      ..close();
-    canvas.drawPath(
-      arrowPath,
-      Paint()..color = AppTheme.colorScheme.secondary,
-    );
+    // Segment dividers — thin radial lines so the player can read slices.
+    for (var i = 0; i < n; i++) {
+      final a = i * sweep + towerRotation;
+      final p1 = Offset(cx, cy);
+      final p2 = Offset(
+        cx + math.cos(a) * (_discWidth / 2),
+        cy + math.sin(a) * (_discHeight / 2),
+      );
+      canvas.drawLine(
+        p1,
+        p2,
+        Paint()
+          ..color = AppTheme.colorScheme.surface.withOpacity(0.35)
+          ..strokeWidth = 1.0,
+      );
+    }
   }
 
   Color _segmentColor(SegmentType t) {
     switch (t) {
       case SegmentType.safe:
-        return AppTheme.safeSegment;
-      case SegmentType.dead:
+        return AppTheme.colorScheme.primary;
+      case SegmentType.deadly:
         return AppTheme.deadSegment;
-      case SegmentType.gap:
-        return AppTheme.gapSegment;
-    }
-  }
-
-  Color _segmentEdge(SegmentType t) {
-    switch (t) {
-      case SegmentType.safe:
-        return AppTheme.safeSegmentEdge;
-      case SegmentType.dead:
-        return AppTheme.deadSegmentEdge;
-      case SegmentType.gap:
-        return AppTheme.colorScheme.outline;
     }
   }
 
   @override
-  bool shouldRepaint(covariant HelixRingPainter old) =>
-      old.ring != ring ||
-      old.ballAngle != ballAngle ||
-      old.rotationProgress != rotationProgress;
+  bool shouldRepaint(covariant HelixTowerPainter old) =>
+      old.cameraY != cameraY ||
+      old.towerRotation != towerRotation ||
+      old.discs != discs ||
+      old.ballScreenFraction != ballScreenFraction;
 }

@@ -61,8 +61,14 @@ class S {
   String get removeAdsCta => _t('Em breve', 'Coming soon', 'Pronto');
   String get howToPlay => _t('Como jogar', 'How to play', 'Cómo jugar');
   String get howToPlayBody => _t(
-        'Toque em SOLTAR para descer um anel. Use ◀ ▶ para girar e fugir das plataformas vermelhas.',
-        'Tap DROP to fall one ring. Use ◀ ▶ to rotate and avoid red platforms.',
-        'Toca SOLTAR para bajar un anillo. Usa ◀ ▶ para girar y esquivar las rojas.',
+        'Arraste para girar a torre. A bolinha cai sozinha — desvie das plataformas vermelhas para somar pontos.',
+        'Drag to rotate the tower. The ball falls on its own — dodge the red platforms to score.',
+        'Arrastra para girar la torre. La pelota cae sola — esquiva las rojas para sumar.',
       );
+  String get gameplayHint => _t(
+        'Arraste para girar e desviar do vermelho.',
+        'Drag to rotate and avoid the red.',
+        'Arrastra para girar y esquivar el rojo.',
+      );
+  String get hint => _t('Dica', 'Tip', 'Pista');
 }

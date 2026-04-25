@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'ds/app_colors.dart';
+import 'ds/app_theme.dart';
+import 'l10n/strings.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   runApp(const GameHelixJumpApp());
@@ -12,21 +14,9 @@ class GameHelixJumpApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Helix Jump',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-        scaffoldBackgroundColor: AppColors.background,
-        useMaterial3: true,
-      ),
-      home: const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: Text(
-            'Helix Jump — building...',
-            style: TextStyle(color: AppColors.text, fontSize: 22),
-          ),
-        ),
-      ),
+      onGenerateTitle: (ctx) => S.of(ctx).appTitle,
+      theme: AppTheme.themeData,
+      home: const SplashScreen(),
     );
   }
 }

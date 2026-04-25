@@ -1,34 +1,52 @@
 import 'package:auricapri_engine/auricapri_engine.dart';
 
-/// Per-phase parameters for Helix Jump. Difficulty scales with phase:
-/// more rings, more dead segments, fewer free gaps.
+/// Per-phase tunables for Helix Jump (physics, infinite mode).
+///
+/// Difficulty grows with phase but stays survivable — `maxDeadly` is capped
+/// so every disc keeps at least one safe segment, and `fallSpeed` is capped
+/// so reflexes can keep up.
 class HelixParams extends LevelParams {
   const HelixParams({
     required super.phase,
     required super.seed,
-    required this.numRings,
-    required this.segmentsPerRing,
-    required this.deadSegmentsPerRing,
-    required this.gapSegmentsPerRing,
+    required this.numSegments,
+    required this.discSpacing,
+    required this.fallSpeed,
+    required this.maxDeadly,
+    required this.spawnAhead,
   });
 
-  factory HelixParams.fromPhase(int phase) {
+  /// Number of pie segments per disc (8 → each = 45°).
+  final int numSegments;
+
+  /// World units between two consecutive discs.
+  final double discSpacing;
+
+  /// Ball fall speed in world units per second.
+  final double fallSpeed;
+
+  /// Upper bound on the number of deadly segments a disc may carry. Always
+  /// leaves at least one safe segment so every disc is survivable.
+  final int maxDeadly;
+
+  /// How far below the camera new discs are pre-spawned, world units.
+  final double spawnAhead;
+
+  factory HelixParams.fromPhase(int phase, {int seed = 0}) {
     final p = phase < 1 ? 1 : phase;
-    final group = (p - 1) ~/ 5;
+    final actualSeed = seed == 0 ? p * 9173 + 17 : seed;
+    final maxDeadly = (1 + (p ~/ 3)).clamp(1, 5); // 1..5 deadly per disc
+    final fallSpeed = (140 + p * 8).clamp(140, 320).toDouble();
     return HelixParams(
       phase: p,
-      seed: p * 9173 + 17,
-      numRings: 8 + group * 2,
-      segmentsPerRing: 6,
-      deadSegmentsPerRing: (1 + group).clamp(1, 3),
-      gapSegmentsPerRing: 2,
+      seed: actualSeed,
+      numSegments: 8,
+      discSpacing: 130,
+      fallSpeed: fallSpeed,
+      maxDeadly: maxDeadly,
+      spawnAhead: 1400,
     );
   }
-
-  final int numRings;
-  final int segmentsPerRing;
-  final int deadSegmentsPerRing;
-  final int gapSegmentsPerRing;
 
   @override
   bool operator ==(Object other) {
@@ -36,19 +54,21 @@ class HelixParams extends LevelParams {
     return other is HelixParams &&
         other.phase == phase &&
         other.seed == seed &&
-        other.numRings == numRings &&
-        other.segmentsPerRing == segmentsPerRing &&
-        other.deadSegmentsPerRing == deadSegmentsPerRing &&
-        other.gapSegmentsPerRing == gapSegmentsPerRing;
+        other.numSegments == numSegments &&
+        other.discSpacing == discSpacing &&
+        other.fallSpeed == fallSpeed &&
+        other.maxDeadly == maxDeadly &&
+        other.spawnAhead == spawnAhead;
   }
 
   @override
   int get hashCode => Object.hash(
         phase,
         seed,
-        numRings,
-        segmentsPerRing,
-        deadSegmentsPerRing,
-        gapSegmentsPerRing,
+        numSegments,
+        discSpacing,
+        fallSpeed,
+        maxDeadly,
+        spawnAhead,
       );
 }

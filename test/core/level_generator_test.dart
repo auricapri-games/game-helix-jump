@@ -7,31 +7,44 @@ void main() {
   group('HelixGenerator', () {
     const generator = HelixGenerator();
 
-    test('seed determinism: same params → same rings', () {
-      final params = HelixParams.fromPhase(7);
-      final a = generator.generate(params);
-      final b = generator.generate(params);
-      expect(a.rings, b.rings);
-      expect(a.phase, b.phase);
+    test('initial state baseline', () {
+      final state = generator.generate(HelixParams.fromPhase(3));
+      expect(state.score, 0);
+      expect(state.movesUsed, 0);
+      expect(state.isOver, isFalse);
+      expect(state.isWon, isFalse);
+      expect(state.cameraY, 0);
+      expect(state.towerRotation, 0);
+      expect(state.passedDiscIds, isEmpty);
     });
 
-    test('angle 0 is always safe by construction', () {
+    test('first disc is all-safe (tutorial guarantee)', () {
       for (var phase = 1; phase <= 50; phase++) {
         final state = generator.generate(HelixParams.fromPhase(phase));
-        for (final ring in state.rings) {
-          expect(ring.segments.first, SegmentType.safe,
-              reason: 'phase $phase ring start must be safe');
+        final firstDisc = state.discs.firstWhere((d) => d.id == 0);
+        for (final s in firstDisc.segments) {
+          expect(s, SegmentType.safe,
+              reason: 'phase $phase first disc must be all-safe');
         }
       }
     });
 
-    test('numRings grows with phase groups of 5', () {
-      final p1 = generator.generate(HelixParams.fromPhase(1));
-      final p10 = generator.generate(HelixParams.fromPhase(10));
-      expect(p10.rings.length, greaterThan(p1.rings.length));
+    test('determinism: same phase → identical disc layout', () {
+      final p = HelixParams.fromPhase(5);
+      final a = generator.generate(p);
+      final b = generator.generate(p);
+      expect(a.discs.length, b.discs.length);
+      for (var i = 0; i < a.discs.length; i++) {
+        expect(a.discs[i], b.discs[i]);
+      }
     });
 
-    test('validateSolvable holds for 200 random phases', () {
+    test('initial state has multiple discs already spawned', () {
+      final state = generator.generate(HelixParams.fromPhase(1));
+      expect(state.discs.length, greaterThan(2));
+    });
+
+    test('validateSolvable holds for 200 phases', () {
       for (var phase = 1; phase <= 200; phase++) {
         final state = generator.generate(HelixParams.fromPhase(phase));
         expect(generator.validateSolvable(state), isTrue,
@@ -39,13 +52,14 @@ void main() {
       }
     });
 
-    test('initial state has zero score and is not over', () {
-      final state = generator.generate(HelixParams.fromPhase(3));
-      expect(state.score, 0);
-      expect(state.movesUsed, 0);
-      expect(state.isOver, isFalse);
-      expect(state.currentRing, 0);
-      expect(state.ballAngle, 0);
+    test('every disc has at least one safe segment', () {
+      for (var phase = 1; phase <= 50; phase++) {
+        final state = generator.generate(HelixParams.fromPhase(phase));
+        for (final disc in state.discs) {
+          expect(disc.segments.contains(SegmentType.safe), isTrue,
+              reason: 'phase $phase disc ${disc.id} has no safe segment');
+        }
+      }
     });
   });
 }
